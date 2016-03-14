@@ -1,0 +1,174 @@
+options {
+  IGNORE_CASE = true;
+  STATIC = false;
+  OUTPUT_DIRECTORY = "src\\com\\esvux\\CompiladorGramatica";
+}
+
+PARSER_BEGIN(ParserGramatica)
+package com.esvux.CompiladorGramatica;
+
+import com.esvux.AST.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+public class ParserGramatica {
+
+  Gramatica gramatica;
+
+  public static void main(String args[]) throws ParseException {
+    ParserGramatica parser = new ParserGramatica(new java.io.StringReader(
+        "Terminal a,b as int; "
+      + "noterminal S,E,T,F as Int; "
+      + "Raiz = S; "
+      + "RegistrarPrecedencia(20,Asociatividad.der,F);"
+    ));
+    parser.gramatica = new Gramatica();
+    parser.GRAMATICA();
+    System.out.println("Exito!!");
+  }
+
+}
+PARSER_END(ParserGramatica)
+
+SKIP: { " " | "\n" | "\t" | "\r" }
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*                    Producción para la declaración de los TERMINALES                    */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void GRAMATICA():{}
+{
+  ( DEFINICIONES() )+ <EOF>
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*                    Producción para la declaración de los TERMINALES                    */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void DEFINICIONES():{}
+{
+  TERMS() ";"
+|
+  NOTERMS() ";"
+|
+  REGS() ";"
+|
+  RAIZ() ";"
+|
+  REGLA() ";"
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*                    Producción para la declaración de los TERMINALES                    */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void TERMS():
+{
+  ArrayList<String> lista; 
+  Token tipo=new Token();
+}
+{
+  "Terminal" lista=L_ID() ( "as" ( tipo="int" | tipo="char" | tipo="double" | tipo="string" | tipo="bool" ) )? 
+  {
+    Iterator<String> it = lista.iterator();
+    while(it.hasNext()){
+      ElementoGramatical temp = new ElementoGramatical(it.next());
+      temp.setTipo(tipo.image);
+      this.gramatica.agregarTerminal(temp);
+    }
+  }
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*                   Producción para la declaración de los NO TERMINALES                  */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void NOTERMS():
+{
+  ArrayList<String> lista; 
+  Token tipo=new Token();
+}
+{
+  "NoTerminal" lista=L_ID() ( "as" ( tipo="int" | tipo="char" | tipo="double" | tipo="string" | tipo="bool" ) )? 
+  {
+    Iterator<String> it = lista.iterator();
+    while(it.hasNext()){
+      ElementoGramatical temp = new ElementoGramatical(it.next());
+      temp.setTipo(tipo.image);
+      this.gramatica.agregarNoTerminal(temp);
+    }
+  }
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*    Producción para registrar la precedencia de los terminales dentro de la gramática   */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void REGS():
+{
+  ArrayList<String> lista;
+  Token prec, asoc = new Token();
+}
+{
+  "RegistrarPrecedencia" "(" prec=<INT> "," ( ( asoc="Asociatividad.izq" | asoc="Asociatividad.der" ) "," )? lista=L_ID() ")"
+  {
+    this.gramatica.registrarPrecedencia(lista, Integer.parseInt(prec.image), asoc.image);
+  }
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*        Producción para reconocer una lista de identificadores separados por coma       */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+ArrayList<String> L_ID():
+{
+  ArrayList<String> lista = new ArrayList<String>();  
+  Token elem1; Token elem2;
+}
+{
+  elem1=<ID> { lista.add(elem1.image); } ( "," elem2=<ID> { lista.add(elem2.image); } )* { return lista; }
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*                   Producción para registrar la raiz de la gramática                    */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void RAIZ():
+{
+  Token raiz = new Token();
+}
+{
+  "Raiz" "=" raiz=<ID> { this.gramatica.setRaiz(raiz.image); }
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*              Producción para declarar las producciones de un NO TERMINAL               */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void REGLA():{}
+{
+  <ID>".Regla" "=" PROD() ( "|" PROD() )*
+}
+
+void PROD():{}
+{
+  <ID> ( "+" ( ACCIONES() )* <ID> )* ( ACCIONES() )*
+}
+
+void ACCIONES():{}
+{
+  "<::" ( ACCION() )+ "::>"
+}
+
+void ACCION():{}
+{
+
+}
+
+TOKEN:{
+    <   ID : ["a"-"z","A"-"Z", "_"] (["a"-"z","A"-"Z","0"-"9","_"])* >
+  | <  INT : (["0"-"9"])+ >
+  | <  DEC : (["0"-"9"])+ "." (["0"-"9"])+ >
+  | <  STR : "\"" ( ( ~["\"","\\","\n","\r"]) | ("\\" ["n","t","v","b","r","f","a","\\","?","'","\""] ) )* "\"" >
+  | < CHAR : "'" ( (~["'","\\","\n","\r"]) | ("\\" ["n","t","v","b","r","f","a","\\","?","'","\""] ) ) "'" >
+}
