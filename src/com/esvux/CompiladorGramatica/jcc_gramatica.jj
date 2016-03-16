@@ -21,10 +21,11 @@ public class ParserGramatica {
       + "noterminal S,E,T,F as Int; "
       + "Raiz = S; "
       + "RegistrarPrecedencia(20,Asociatividad.der,F);"
+      + "s.REGLA = E <:: vector[a+5]=(a AND b + 5);  WRITE(RESULT1.valor); ::> ;"
     ));
     parser.gramatica = new Gramatica();
     parser.GRAMATICA();
-    System.out.println("Exito!!");
+    System.out.println("Exito!!!");
   }
 
 }
@@ -34,7 +35,7 @@ SKIP: { " " | "\n" | "\t" | "\r" }
 
 
 //<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-/*                    Producción para la declaración de los TERMINALES                    */
+/*                        Producción de inicio para el analizador                         */
 //<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 void GRAMATICA():{}
 {
@@ -43,19 +44,30 @@ void GRAMATICA():{}
 
 
 //<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-/*                    Producción para la declaración de los TERMINALES                    */
+/*                   Producción para la clasificación de las sentencias                   */
 //<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 void DEFINICIONES():{}
 {
-  TERMS() ";"
-|
-  NOTERMS() ";"
-|
-  REGS() ";"
-|
-  RAIZ() ";"
-|
-  REGLA() ";"
+  try { //Recuperación de errores a nivel de frase.
+    (
+      TERMS() <PYC>
+    |
+      NOTERMS() <PYC>
+    |
+      REGS() <PYC>
+    |
+      RAIZ() <PYC>
+    |
+      REGLA() <PYC>
+    )
+  }catch (ParseException e) {
+    System.out.println(e.toString());
+    Token t;
+    do {
+      t = getNextToken();
+      //Ignora todos los tokens hasta encontrar el punto y coma ; = PYC, y reinicia el análisis.
+    } while (t.kind != PYC);
+  }
 }
 
 
@@ -152,7 +164,7 @@ void REGLA():{}
 
 void PROD():{}
 {
-  <ID> ( "+" ( ACCIONES() )* <ID> )* ( ACCIONES() )*
+  <ID>  ( ACCIONES() )? ( "+" <ID> ( ACCIONES() )? )* 
 }
 
 void ACCIONES():{}
@@ -160,15 +172,310 @@ void ACCIONES():{}
   "<::" ( ACCION() )+ "::>"
 }
 
-void ACCION():{}
+void ACCION():{ Nodo nodo; }
 {
+  try { //Recuperación de errores a nivel de frase.
+    (
+      LOOKAHEAD(2)
+      nodo=ASIGNACION() <PYC>
+    |
+      LOOKAHEAD(2)
+      nodo=CALL_METODO() <PYC>
+    |
+      nodo=CALL_WRITE() <PYC>
+    )
+    { System.out.println(nodo.getDOT()); }
+  }catch (ParseException e) {
+    System.out.println(e.toString());
+    Token t;
+    do {
+      t = getNextToken();
+      //Ignora todos los tokens hasta encontrar el punto y coma ; = PYC, y reinicia el análisis.
+    } while (t.kind != PYC);
+  }
+}
 
+Nodo ASIGNACION():{ Nodo dest, exp; }
+{
+  dest=DESTINO() "=" exp=EXPRESION()
+  {
+    Nodo nodo = new Nodo(Nodo.ASIGNACION);
+    nodo.addNodo(dest);
+    nodo.addNodo(exp);
+    return nodo;
+  }
+}
+
+Nodo CALL_METODO():
+{
+  ArrayList<Nodo> params; 
+  Token valor;
+}
+{
+  valor=<ID> "(" params=PARAMS() ")" 
+  { 
+    return new Nodo(Nodo.METODO, valor.image, params); 
+  }
+}
+
+Nodo CALL_WRITE():{ Nodo exp; }
+{
+  "Write" "(" exp=EXPRESION() ")"
+  { 
+    Nodo nodo = new Nodo(Nodo.WRITE); 
+    nodo.addNodo(exp);
+    return nodo;
+  }
+}
+
+ArrayList<Nodo> PARAMS():
+{ 
+  ArrayList<Nodo> params = new ArrayList<Nodo>(); 
+  Nodo nodo; 
+}
+{
+  ( nodo=EXPRESION() { params.add(nodo); } ( "," nodo=EXPRESION() { params.add(nodo); } )* )? { return params; }
+}
+
+Nodo DESTINO():
+{
+  Nodo nodo = null; 
+  Token valor, atrb = null; 
+  ArrayList<Nodo> dims = null; 
+}
+{
+  (
+    valor=<ID> ( dims=DIMENSIONES() )?
+    {      
+      if(dims==null)
+        nodo = new Nodo(Nodo.VARIABLE, valor.image);
+      else 
+        nodo = new Nodo(Nodo.ARREGLO, valor.image, dims);
+    }
+  |
+    valor=<RSLT> "." atrb=<ID>
+    {
+      nodo = new Nodo(Nodo.RESULT, valor.image);
+      Nodo temp;
+      if(atrb.image.endsWith("H"))
+        temp = new Nodo(Nodo.HEREDADO, atrb.image);
+      else
+        temp = new Nodo(Nodo.SINTETIZADO, atrb.image);
+      nodo.addNodo(temp);
+    }
+  )
+  { return nodo; }
+}
+
+ArrayList<Nodo> DIMENSIONES():{ ArrayList<Nodo> dims = new ArrayList<Nodo>(); Nodo nodo; }
+{
+  "[" nodo=EXP() "]" { dims.add(nodo); } ( "[" nodo=EXP() "]" { dims.add(nodo); } )* { return dims; }
+}
+
+Nodo EXPRESION():{ Nodo expresion; }
+{
+  expresion=LOG()
+  { return expresion; }
+}
+
+Nodo LOG():{ Nodo ret = null, or, orExtra; }
+{
+  or=LOG_OR() ( "Or" orExtra=LOG_OR() 
+          {
+            ret = new Nodo(Nodo.OR);
+            ret.addNodo(or);
+            ret.addNodo(orExtra);
+          }
+        )*
+  { if(ret==null) return or; return ret; }
+}
+
+Nodo LOG_OR():{ Nodo ret = null, xor, xorExtra; }
+{
+  xor=LOG_XOR() ( "Xor" xorExtra=LOG_XOR() 
+          {
+            ret = new Nodo(Nodo.XOR);
+            ret.addNodo(xor);
+            ret.addNodo(xorExtra);
+          }
+        )*
+  { if(ret==null) return xor; return ret; }
+}
+
+Nodo LOG_XOR():{ Nodo ret = null, and, andExtra; }
+{
+  and=LOG_AND() ( "And" andExtra=LOG_AND() 
+            {
+              ret = new Nodo(Nodo.AND);
+              ret.addNodo(and);
+              ret.addNodo(andExtra);
+            }
+          )*
+  { if(ret==null) return and; return ret; }
+}
+
+Nodo LOG_AND():{ Nodo ret = null, nodo; }
+{
+  (
+    "Not" nodo=LOG_AND()
+    {
+      ret = new Nodo(Nodo.NOT);
+      ret.addNodo(nodo);
+    }
+  |
+    ret=REL()
+  )
+  { return ret; }
+}
+
+Nodo REL():{ Nodo ret = null, exp, expExtra; String op; }
+{
+  exp=EXP() ( op=OP() expExtra=EXP() 
+          {
+            ret = new Nodo(op);
+            ret.addNodo(exp);
+            ret.addNodo(expExtra);
+          }
+        )? 
+  { if(ret==null) return exp; return ret; }
+}
+
+String OP():{ Token op; }
+{
+  ( op="<" | op=">" | op="<=" | op=">=" | op="==" | op="!=" )
+  { return op.image; }
+}
+
+Nodo EXP():{ Nodo ret = null, term, termExtra; }
+{
+  term=TER() ( "+" termExtra=TER() 
+          {
+            ret = new Nodo(Nodo.SUMA);
+            ret.addNodo(term);
+            ret.addNodo(termExtra);
+          }
+         | "-" termExtra=TER() 
+          {
+            ret = new Nodo(Nodo.RESTA);
+            ret.addNodo(term);
+            ret.addNodo(termExtra);
+          }
+         )*
+  { if(ret==null) return term; return ret; }
+}
+
+Nodo TER():{ Nodo ret = null, factor, factorExtra; }
+{
+  factor=FAC() ( "*" factorExtra=FAC() 
+            {
+              ret = new Nodo(Nodo.MULTIPLICA);
+              ret.addNodo(factor);
+              ret.addNodo(factorExtra);
+            }
+           | "/" factorExtra=FAC() 
+              {
+              ret = new Nodo(Nodo.DIVIDE);
+              ret.addNodo(factor);
+              ret.addNodo(factorExtra);
+              }
+           )*
+  { if(ret==null) return factor; return ret; }
+}
+
+Nodo FAC():{ Nodo ret = null, base, exp; }
+{
+  base=VAL() ( "^" exp=VAL()
+          {
+            ret = new Nodo(Nodo.POTENCIA);
+            ret.addNodo(base);
+            ret.addNodo(exp);
+          }
+         )* 
+  { if(ret==null) return base; return ret; }
+}
+
+Nodo VAL():{ Nodo ret = null, nodo; }
+{
+  nodo=UNI() ( "++" 
+          {   
+            ret = new Nodo(Nodo.INCREMENTO); 
+            ret.addNodo(nodo);
+          }
+         | "--"
+          {   
+            ret = new Nodo(Nodo.DECREMENTO); 
+            ret.addNodo(nodo);
+          }
+         )? 
+  { if(ret==null) return nodo; return ret; }
+}
+
+Nodo UNI():
+{ 
+  Nodo nodo = null; 
+  Token valor, extra = null; 
+  ArrayList<Nodo> dims = null; 
+}
+{
+  (
+    "(" nodo=LOG() ")"
+  | 
+    "[" nodo=LOG() "]"
+  | 
+    "{" nodo=LOG() "}"
+  | 
+    LOOKAHEAD(2)
+    nodo=CALL_METODO()
+  | 
+    LOOKAHEAD(2)
+    valor=<ID> ( dims = DIMENSIONES() )?
+    {
+      if(dims==null)
+        nodo = new Nodo(Nodo.VARIABLE, valor.image);
+      else
+        nodo = new Nodo(Nodo.ARREGLO, valor.image, dims);
+    }
+  |
+    valor=<RSLT> ( "." extra=<ID> )?
+    {
+      nodo = new Nodo(Nodo.RESULT, valor.image);
+      if(extra!=null){
+        Nodo temp;
+        if(extra.image.endsWith("H") || extra.image.endsWith("h"))
+          temp = new Nodo(Nodo.HEREDADO, extra.image);
+        else
+          temp = new Nodo(Nodo.SINTETIZADO, extra.image);
+        nodo.addNodo(temp);
+      }
+    }
+  |
+    valor=<INT> 
+    { nodo = new Nodo(Nodo.ENTERO, valor.image); }
+  |
+    valor=<DEC>
+    { nodo = new Nodo(Nodo.DECIMAL, valor.image); }
+  |
+    valor=<STR>
+    { nodo = new Nodo(Nodo.CADENA, valor.image); }
+  |
+    valor=<CHAR>
+    { nodo = new Nodo(Nodo.CARACTER, valor.image); }
+  |
+    "true"
+    { nodo = new Nodo(Nodo.BOOLEANO, "true"); }
+  |
+    "false"
+    { nodo = new Nodo(Nodo.BOOLEANO, "false"); }
+  )
+  { return nodo; }
 }
 
 TOKEN:{
-    <   ID : ["a"-"z","A"-"Z", "_"] (["a"-"z","A"-"Z","0"-"9","_"])* >
-  | <  INT : (["0"-"9"])+ >
-  | <  DEC : (["0"-"9"])+ "." (["0"-"9"])+ >
-  | <  STR : "\"" ( ( ~["\"","\\","\n","\r"]) | ("\\" ["n","t","v","b","r","f","a","\\","?","'","\""] ) )* "\"" >
+    < RSLT : "RESULT"(["0"-"9"])+ > 
+  | <  PYC : ";" >
+  | <   ID : ["a"-"z","A"-"Z", "_"] (["a"-"z","A"-"Z","0"-"9","_"])* >
   | < CHAR : "'" ( (~["'","\\","\n","\r"]) | ("\\" ["n","t","v","b","r","f","a","\\","?","'","\""] ) ) "'" >
+  | <  STR : "\"" ( ( ~["\"","\\","\n","\r"]) | ("\\" ["n","t","v","b","r","f","a","\\","?","'","\""] ) )* "\"" >
+  | <  INT : ("-")?(["0"-"9"])+ >
+  | <  DEC : ("-")?(["0"-"9"])+ "." (["0"-"9"])+ >
 }

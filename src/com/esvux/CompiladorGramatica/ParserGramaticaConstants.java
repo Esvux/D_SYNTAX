@@ -11,15 +11,19 @@ public interface ParserGramaticaConstants {
   /** End of File. */
   int EOF = 0;
   /** RegularExpression Id. */
-  int ID = 27;
+  int RSLT = 50;
   /** RegularExpression Id. */
-  int INT = 28;
+  int PYC = 51;
   /** RegularExpression Id. */
-  int DEC = 29;
+  int ID = 52;
   /** RegularExpression Id. */
-  int CHAR = 30;
+  int CHAR = 53;
   /** RegularExpression Id. */
-  int STR = 31;
+  int STR = 54;
+  /** RegularExpression Id. */
+  int INT = 55;
+  /** RegularExpression Id. */
+  int DEC = 56;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -31,7 +35,6 @@ public interface ParserGramaticaConstants {
     "\"\\n\"",
     "\"\\t\"",
     "\"\\r\"",
-    "\";\"",
     "\"Terminal\"",
     "\"as\"",
     "\"int\"",
@@ -53,11 +56,37 @@ public interface ParserGramaticaConstants {
     "\"+\"",
     "\"<::\"",
     "\"::>\"",
+    "\"Write\"",
+    "\".\"",
+    "\"[\"",
+    "\"]\"",
+    "\"Or\"",
+    "\"Xor\"",
+    "\"And\"",
+    "\"Not\"",
+    "\"<\"",
+    "\">\"",
+    "\"<=\"",
+    "\">=\"",
+    "\"==\"",
+    "\"!=\"",
+    "\"-\"",
+    "\"*\"",
+    "\"/\"",
+    "\"^\"",
+    "\"++\"",
+    "\"--\"",
+    "\"{\"",
+    "\"}\"",
+    "\"true\"",
+    "\"false\"",
+    "<RSLT>",
+    "\";\"",
     "<ID>",
-    "<INT>",
-    "<DEC>",
     "<CHAR>",
     "<STR>",
+    "<INT>",
+    "<DEC>",
   };
 
 }
