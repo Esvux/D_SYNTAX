@@ -20,6 +20,7 @@ package com.esvux.AST.gramatica;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Stack;
 import java.util.TreeSet;
 
 /**
@@ -49,16 +50,30 @@ public class GeneradorLR {
             return;
         }
         gram.cambiarModoLR();
+        //Item aumentado... que vendría a ser la producción raíz del estado inicial
         ItemLR itemAumentado = new ItemLR(inicio, Elemento.ELEM_FINAL);
+        //Nuevo estado vacío...
         EstadoLR inicial = new EstadoLR(getNuevoNombre());
+        //Agrego el elemento al nuevo estado...
         inicial.add(itemAumentado);
+        //Reemplazo el estado inicial por el resultado de aplicar la cerradura sobre él...
         inicial = cerradura(inicial);
+        //Agrego el estado inicial a la colección principal de estados...
         this.estadosLR.add(inicial);
-        for (Iterator<Elemento> itElementos = gram.getElementosLR().values().iterator(); itElementos.hasNext();) {
-            EstadoLR nuevo = ir_a(inicial, itElementos.next().getId());
-            if (!nuevo.isEmpty()) {
-                nuevo.setNombre(getNuevoNombre());
-                this.estadosLR.add(nuevo);
+        //Declaro una pila de estados para recorrerlos con IR_A...
+        Stack<EstadoLR> pilaAuxiliar = new Stack<>();
+        //Agrego el estado inicial a una pila para recorrerlo después...
+        pilaAuxiliar.push(inicial);
+        //Inicia las operaciones IR_A sobre los estados, mientras hayan estados aún en la pila...
+        while (!pilaAuxiliar.isEmpty()) {
+            EstadoLR pivote = pilaAuxiliar.pop();
+            for (Iterator<Elemento> itElementos = gram.getElementosLR().values().iterator(); itElementos.hasNext();) {
+                EstadoLR nuevo = ir_a(pivote, itElementos.next().getId());
+                if (!nuevo.isEmpty()) {
+                    nuevo.setNombre(getNuevoNombre());
+                    this.estadosLR.add(nuevo);
+                    pilaAuxiliar.add(nuevo);
+                }
             }
         }
         for (Iterator<EstadoLR> iterator = this.estadosLR.iterator(); iterator.hasNext();) {
@@ -82,8 +97,9 @@ public class GeneradorLR {
                 }
             }
         }
-        if(J.isEmpty())
+        if (J.isEmpty()) {
             return J;
+        }
         return cerradura(J);
     }
 

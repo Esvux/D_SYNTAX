@@ -27,18 +27,17 @@ import java.util.Iterator;
 public class EstadoLR extends java.util.TreeSet<ItemLR> implements Comparable<EstadoLR> {
 
     private String nombre;
+    
 
     public EstadoLR(String nombre) {
         super();
         this.nombre = nombre;
     }
 
-// <editor-fold defaultstate="collapsed" desc="Getters & Setters">
     public String getNombre() {
         return nombre;
     }
 
-// </editor-fold>                        
     @Override
     public int compareTo(EstadoLR o) {
         if (this.size() < o.size()) {
@@ -67,7 +66,8 @@ public class EstadoLR extends java.util.TreeSet<ItemLR> implements Comparable<Es
 
     public void mostrar(Gramatica gram) {
         String cadena = "Estado: " + this.nombre + "\n";
-        for (Iterator<ItemLR> itItems = this.iterator(); itItems.hasNext();) {
+        Iterator<ItemLR> itItems = this.iterator();
+        while (itItems.hasNext()) {
             ItemLR next = itItems.next();
             cadena += gram.getElemento(next.getEncabezado()).getPresentacion() + "->";
             for (int i = 0; i < next.getDerivacion().size(); i++) {
@@ -76,8 +76,9 @@ public class EstadoLR extends java.util.TreeSet<ItemLR> implements Comparable<Es
                 }
                 cadena += gram.getElemento(next.getDerivacion().get(i)).getPresentacion() + " ";
             }
-            if(next.getPuntero().compareTo(next.getDerivacion().size())==0)
+            if (next.getPuntero().compareTo(next.getDerivacion().size()) == 0) {
                 cadena += "·";
+            }
             cadena += ", {";
             for (Iterator<Integer> iterator = next.getAnticipacion().iterator(); iterator.hasNext();) {
                 cadena += gram.getElemento(iterator.next()).getPresentacion() + (iterator.hasNext() ? "," : "");
@@ -87,8 +88,8 @@ public class EstadoLR extends java.util.TreeSet<ItemLR> implements Comparable<Es
         System.out.println(cadena);
     }
 
-    public void setNombre(String nombre){
+    public void setNombre(String nombre) {
         this.nombre = nombre;
     }
-    
+
 }
