@@ -7,6 +7,7 @@ options {
 PARSER_BEGIN(ParserGramatica)
 package com.esvux.CompiladorGramatica;
 
+import com.esvux.AST.gramatica.*;
 import com.esvux.AST.*;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -17,11 +18,13 @@ public class ParserGramatica {
 
   public static void main(String args[]) throws ParseException {
     ParserGramatica parser = new ParserGramatica(new java.io.StringReader(
-        "Terminal a,b as int; "
-      + "noterminal S,E,T,F as Int; "
-      + "Raiz = S; "
-      + "RegistrarPrecedencia(20,Asociatividad.der,F);"
-      + "s.REGLA = E <:: vector[a+5]=(a AND b + 5);  WRITE(RESULT1.valor); ::> ;"
+                "Terminal id as String;\n"
+                + "Terminal entero, caracter;\n"
+                + "NoTerminal D, T, L;\n"
+                + "Raiz = D;\n"
+                + "D.Regla = T + <:: Result2.tipoH = RESULT1.tipo; ::> L;\n"
+                + "T.Regla = entero <:: REsult0.tipo = resulto1; ::> | caracter <:: REsult0.tipo = resulto1; ::> ;\n"
+                + "L.Regla = <:: Result1.tipoH = RESULT0.tipo; ::> L + id | id;\n"
     ));
     parser.gramatica = new Gramatica();
     parser.GRAMATICA();
@@ -84,10 +87,12 @@ void TERMS():
   {
     Iterator<String> it = lista.iterator();
     while(it.hasNext()){
-      ElementoGramatical temp = new ElementoGramatical(it.next());
+      Elemento temp = Elemento.nuevoElemento(it.next());
       temp.setTipo(tipo.image);
-      this.gramatica.agregarTerminal(temp);
+      temp.marcarComoTerminal();
+      this.gramatica.agregarElemento(temp);
     }
+    Produccion.setGRAMATICA(this.gramatica);
   }
 }
 
@@ -105,10 +110,12 @@ void NOTERMS():
   {
     Iterator<String> it = lista.iterator();
     while(it.hasNext()){
-      ElementoGramatical temp = new ElementoGramatical(it.next());
+      Elemento temp = Elemento.nuevoElemento(it.next());
       temp.setTipo(tipo.image);
-      this.gramatica.agregarNoTerminal(temp);
+      temp.marcarComoNoTerminal();
+      this.gramatica.agregarElemento(temp);
     }
+    Produccion.setGRAMATICA(this.gramatica);
   }
 }
 
@@ -125,6 +132,7 @@ void REGS():
   "RegistrarPrecedencia" "(" prec=<INT> "," ( ( asoc="Asociatividad.izq" | asoc="Asociatividad.der" ) "," )? lista=L_ID() ")"
   {
     this.gramatica.registrarPrecedencia(lista, Integer.parseInt(prec.image), asoc.image);
+    Produccion.setGRAMATICA(this.gramatica);
   }
 }
 
@@ -157,22 +165,76 @@ void RAIZ():
 //<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 /*              Producción para declarar las producciones de un NO TERMINAL               */
 //<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-void REGLA():{}
+void REGLA():
+{  
+  Produccion obligatoria, extra;
+  Token izq; 
+}
 {
-  <ID>".Regla" "=" PROD() ( "|" PROD() )*
+  //<ID> ".Regla" "=" PROD() ( "|" PROD() )*
+  izq=<ID> ".Regla" "=" obligatoria=PROD() 
+  { 
+    obligatoria.setLadoIzq(izq.image); 
+    this.gramatica.agregarProduccion(obligatoria);
+  } 
+  (
+   "|" extra=PROD() 
+    {
+      extra.setLadoIzq(izq.image);
+      this.gramatica.agregarProduccion(extra);
+    }   
+  )*
 }
 
-void PROD():{}
+Produccion PROD():
+{ 
+  ArrayList<String> lista = new ArrayList<String>(); 
+  ArrayList<Nodo> accionesET = new ArrayList<Nodo>();
+  ArrayList<Nodo> accionesDDS = new ArrayList<Nodo>();
+  Token id;
+}
 {
-  <ID>  ( ACCIONES() )? ( "+" <ID> ( ACCIONES() )? )* 
+  //( ACCIONES() )? <ID> ( "+" ( ACCIONES() )? <ID> )* ( ACCIONES() )? 
+  ( 
+    accionesET=ACCIONES()
+    { 
+      lista.add(gramatica.agregarMarcador(accionesET)); 
+    } 
+  )?
+  id=<ID> { lista.add(id.image); } 
+  ( "+" 
+    ( 
+      accionesET=ACCIONES() 
+      { 
+        lista.add(gramatica.agregarMarcador(accionesET)); 
+      } 
+    )? 
+    id=<ID> 
+    { 
+      lista.add(id.image); 
+    }
+  )*
+  ( 
+    accionesDDS=ACCIONES() 
+  )? 
+  { return Produccion.nuevaProduccion(lista, accionesDDS); }
 }
 
-void ACCIONES():{}
+ArrayList<Nodo> ACCIONES():{ ArrayList<Nodo> acciones = new ArrayList<Nodo>(); Nodo accion=null;}
 {
-  "<::" ( ACCION() )+ "::>"
+  "<::" 
+  ( 
+    accion=ACCION() 
+      {
+        if(accion!=null)
+          acciones.add(accion);
+      }
+  )+ 
+  "::>" 
+  { return acciones; }
 }
 
-void ACCION():{ Nodo nodo; }
+Nodo ACCION():{ Nodo nodo = null; }
 {
   try { //Recuperación de errores a nivel de frase.
     (
@@ -193,6 +255,7 @@ void ACCION():{ Nodo nodo; }
       //Ignora todos los tokens hasta encontrar el punto y coma ; = PYC, y reinicia el análisis.
     } while (t.kind != PYC);
   }
+  { return nodo; }
 }
 
 Nodo ASIGNACION():{ Nodo dest, exp; }
@@ -384,7 +447,7 @@ Nodo TER():{ Nodo ret = null, factor, factorExtra; }
 
 Nodo FAC():{ Nodo ret = null, base, exp; }
 {
-  base=VAL() ( "^" exp=VAL()
+  base=INC() ( "^" exp=INC()
           {
             ret = new Nodo(Nodo.POTENCIA);
             ret.addNodo(base);
@@ -394,9 +457,9 @@ Nodo FAC():{ Nodo ret = null, base, exp; }
   { if(ret==null) return base; return ret; }
 }
 
-Nodo VAL():{ Nodo ret = null, nodo; }
+Nodo INC():{ Nodo ret = null, nodo; }
 {
-  nodo=UNI() ( "++" 
+  nodo=VAL() ( "++" 
           {   
             ret = new Nodo(Nodo.INCREMENTO); 
             ret.addNodo(nodo);
@@ -410,7 +473,7 @@ Nodo VAL():{ Nodo ret = null, nodo; }
   { if(ret==null) return nodo; return ret; }
 }
 
-Nodo UNI():
+Nodo VAL():
 { 
   Nodo nodo = null; 
   Token valor, extra = null; 

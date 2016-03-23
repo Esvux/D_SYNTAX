@@ -30,7 +30,7 @@ public class Nodo {
             RESTA = "-",
             NOT = "!",
             AND = "&&",
-            XOR = "|&|",
+            XOR = "x",
             OR = "||",
             WRITE = "llamada a write",
             ASIGNACION = "asignación";

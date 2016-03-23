@@ -1,0 +1,279 @@
+options {
+  IGNORE_CASE = true;
+  STATIC = false;
+  OUTPUT_DIRECTORY = "src\\com\\esvux\\CompiladorCodigo";
+}
+
+PARSER_BEGIN(ParserCodigo)
+package com.esvux.CompiladorCodigo;
+
+import com.esvux.AST.codigo.*;
+import com.esvux.AST.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+public class ParserCodigo {
+
+  Programa programa;
+
+  public static void main(String args[]) throws ParseException {
+    ParserCodigo parser = new ParserCodigo(new java.io.StringReader(
+        "a,b,c as Int\n"
+      + "sub setTipo()\n"
+      + "end sub\n"
+      + "function sumar(sum1 as Int, sum2 as Int) as Int\n"
+      + "end function\n"
+    ));
+    parser.programa = new Programa();
+    parser.CODIGO();
+    System.out.println("Exito!!!");
+  }
+
+}
+PARSER_END(ParserCodigo)
+
+SKIP: { " " | "\t" | "\r" }
+
+TOKEN:{
+    <        _AS : "as">
+  | <    _DOUBLE : "double">
+  | <      _BOOL : "bool">
+  | <    _STRING : "string">
+  | <      _CHAR : "char">  
+  | <       _INT : "int">
+  | <       _SUB : "sub">
+  | <    _ENDSUB : "end"( " " )+"sub">
+  | <       _FUN : "function">
+  | <    _ENDFUN : "end"( " " )+"function">
+  | <        _IF : "if">
+  | <     _ENDIF : "end"( " " )+"if">
+  | <    _SWITCH : "switch">
+  | < _ENDSWITCH : "end"( " " )+"switch">
+  | <     _WHILE : "while">
+  | <  _ENDWHILE : "end"( " " )+"while">
+  | <      _LOOP : "loop">
+  | <   _ENDLOOP : "end"( " " )+"loop">
+  | <    _RETURN : "return">
+  | <   _DEFAULT : "default">
+  | <      _THEN : "then">
+  | <    _ELSEIF : "elseif">
+  | <      _ELSE : "else">
+  | <     _BREAK : "break">
+  | <      _CASE : "case">
+  | <        _DO : "do">
+  | <     _UNTIL : "until">
+  | <       _FOR : "for">
+  | <        _TO : "to">
+  | <      _STEP : "step">
+  | <      _NEXT : "next">
+  | <     _WRITE : "write">  
+  | <       _FIN : "\n" >
+}
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*                        Producción de inicio para el analizador                         */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void CODIGO():{}
+{
+  ( DECLARACIONES() )+ <EOF>
+}
+
+
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+/*                   Producción para la clasificación de las sentencias                   */
+//<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+void DECLARACIONES():{}
+{
+  try { //Recuperación de errores a nivel de frase.
+    (
+      LOOKAHEAD(2)
+      DECLARACION_VARIABLES_GLOBALES()
+    |
+      LOOKAHEAD(2)
+      DECLARACION_ARREGLO_GLOBAL()
+    |
+      DECLARACION_METODO()
+    |
+      DECLARACION_FUNCION()
+    |
+      <_FIN>
+    )
+  }catch (ParseException e) {
+    System.out.println(e.toString());
+    Token t;
+    do {
+      t = getNextToken();
+      //Ignora todos los tokens hasta encontrar el salto de linea \n = _FIN, y reinicia el análisis.
+    } while (t.kind != _FIN);
+  }
+}
+
+void DECLARACION_VARIABLES_GLOBALES():{}
+{
+  L_ID() <_AS> TIPO() <_FIN>
+}
+
+void DECLARACION_ARREGLO_GLOBAL():{}
+{
+  <ID> ( DIMENSIONES() ) <_AS> TIPO() <_FIN>
+}
+
+void DECLARACION_METODO():{}
+{
+  <_SUB> <ID> "(" PARAMETROS() ")" <_FIN>
+    ( SENTENCIAS() | ( <_FIN> )* )
+  <_ENDSUB> <_FIN>
+}
+
+void DECLARACION_FUNCION():{}
+{
+  <_FUN> <ID> "(" PARAMETROS() ")" <_AS> TIPO() <_FIN>
+    ( SENTENCIAS() | ( <_FIN> )* )
+  <_ENDFUN> <_FIN>
+}
+
+void PARAMETROS():{}
+{
+  ( PARAM() ("," PARAM() )* )?
+}
+
+void PARAM():{}
+{
+  <ID> <_AS> TIPO()
+}
+
+void DIMENSIONES():{}
+{
+  "[" "]" ( "[" "]" )*
+}
+
+void L_ID():{}
+{
+  <ID> ( "," <ID> )*
+}
+
+String TIPO():{ Token tipo; }
+{
+  ( tipo="int" | tipo="char" | tipo="double" | tipo="string" | tipo="bool" )
+  { return tipo.image; }
+}
+
+void SENTENCIAS():{}
+{
+  ( SENTENCIA() )*
+}
+
+void SENTENCIA():{}
+{
+  (
+    DECLARACION_VARIABLES_LOCALES()
+  |
+    ASIGNACION()
+  |
+    METODO()
+  |
+    IF()
+  |
+    SWITCH()
+  |
+    WHILE()
+  |
+    UNTIL()
+  |
+    LOOP()
+  |
+    FOR()
+  |
+    WRITE()
+  |
+    RETURN()
+  )
+}
+
+void RETURN():{}
+{
+  <_RETURN> EXPRESION();
+}
+
+void WRITE():{}
+{
+  <_WRITE> "(" EXPRESION() ")" <_FIN>
+}
+
+void FOR():{}
+{
+  <_FOR> DESTINO() "=" EXPRESION() <_TO> EXPRESION() [<_STEP> <INT>] <_FIN>
+  SENTENCIAS()
+  <_NEXT>
+}
+
+void LOOP():{}
+{
+  <_LOOP>
+  SENTENCIAS()
+  <_ENDLOOP>
+}
+
+void UNTIL():{}
+{
+  <_DO>
+  SENTENCIAS()
+  <_UNTIL> CONDICION() <_FIN>
+}
+
+void WHILE():{}
+{
+  <_WHILE> CONDICION() <_FIN>
+  SENTENCIAS()
+  <_ENDWHILE>
+}
+
+void SWITCH():{}
+{
+  <_SWITCH> EXPRESION() <_FIN>
+  ( <_CASE> ( VALOR() | <_DEFAULT> ) <_FIN> SENTENCIAS() )+
+  <_ENDSWITCH>
+}
+
+void IF():{}
+{
+  <_IF> CONDICION() <_THEN> <_FIN> SENTENCIAS()
+  ( <_ELSEIF> CONDICION() <_THEN> <_FIN> SENTENCIAS() )*
+  ( <_ELSE> <_FIN> SENTENCIAS() )?
+  <_ENDIF>
+}
+
+void METODO():{}
+{
+  <ID> "(" VALORES() ")" <_FIN>
+}
+
+void DECLARACION_VARIABLES_LOCALES():{}
+{
+  ( 
+    LOOKAHEAD(2)
+    L_ID() <_AS> TIPO() <_FIN>
+  |
+    LOOKAHEAD(2)
+    <ID> ( DIMENSIONES() ) <_AS> TIPO() <_FIN>
+  )
+}
+
+void ASIGNACION():{}
+{
+  ( 
+    LOOKAHEAD(2)
+    DESTINO() "=" EXPRESION() <_FIN> 
+  |
+    LOOKAHEAD(2)
+    DESTINO() ( "++" | "--" ) <_FIN>
+  )
+}
+
+TOKEN:{
+    <   ID : ["a"-"z","A"-"Z", "_"] (["a"-"z","A"-"Z","0"-"9","_"])* >
+  | < CHAR : "'" ( (~["'","\\","\n","\r"]) | ("\\" ["n","t","v","b","r","f","a","\\","?","'","\""] ) ) "'" >
+  | <  STR : "\"" ( ( ~["\"","\\","\n","\r"]) | ("\\" ["n","t","v","b","r","f","a","\\","?","'","\""] ) )* "\"" >
+  | <  INT : ("-")?(["0"-"9"])+ >
+  | <  DEC : ("-")?(["0"-"9"])+ "." (["0"-"9"])+ >
+}
