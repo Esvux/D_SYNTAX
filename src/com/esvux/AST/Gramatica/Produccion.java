@@ -138,7 +138,7 @@ public class Produccion implements Comparable<Produccion> {
     public ArrayList<Elemento> getLadoDer() {
         return ladoDer;
     }
-    
+
     public void marcarComoMarcador(){
         this.esMarcador = true;
     }

@@ -18,7 +18,7 @@ public class Gramatica {
     private HashMap<Integer, Elemento> elementosLR;
     private TreeSet<Produccion> producciones;
     private ArrayList<ErrorDeCompilacion> errores;
-    public static int llaveElementos = 0;
+    public static int llaveElementos = -1;
     public static int llaveMarcadores = 0;
     public static int llaveProducciones = 0;
 
@@ -214,11 +214,11 @@ public class Gramatica {
         }
         return izqProd;
     }
-    
+
     public Elemento getElemento(Integer key){
         return this.elementosLR.get(key);
     }
-    
+
     public Produccion getProduccion(Integer key){
         Iterator<Produccion> itProd = this.producciones.iterator();
         while (itProd.hasNext()) {
@@ -226,7 +226,7 @@ public class Gramatica {
             if(next.getId().compareTo(key)==0){
                 return next;
             }
-        }        
+        }
         return null;
     }
 
