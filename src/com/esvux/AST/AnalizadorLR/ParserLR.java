@@ -1,4 +1,4 @@
-// <editor-fold defaultstate="collapsed" desc="Licencia">
+// <editor-fold defaultstate="collapsed" desc="Licencia de software">
 /*
  * Copyright (C) 2016 Esvin
  *
@@ -17,16 +17,28 @@
  */
 // </editor-fold>                        
 
-package com.esvux.AST.Codigo;
+package com.esvux.AST.AnalizadorLR;
+
+import com.esvux.AST.Gramatica.Gramatica;
+import java.util.ArrayList;
 
 /**
  *
  * @author Esvin
  */
-public class Programa {
+public class ParserLR {
 
+    private static TablaAnalisisLR TABLA_AS;
+    private static Gramatica GRAMATICA;
 
-// <editor-fold defaultstate="collapsed" desc="Getters & Setters">
-// </editor-fold>                        
+    public ParserLR(Gramatica gramatica, TablaAnalisisLR tablaAS) {
+        GRAMATICA = gramatica;
+        TABLA_AS = tablaAS;
+    }
 
+//    public void parsear(ArrayList<Token>){
+//        
+//    }
+    
+    
 }

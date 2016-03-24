@@ -37,23 +37,27 @@ public class GeneradorLR {
     private TreeSet<EstadoLR> estadosLR;
     private ArrayList<TransicionLR> transicionesLR;
     private TablaAnalisisLR tablaLR;
-    private static Gramatica gram;
+    private static Gramatica GRAMATICA;
     private Integer llaveEstados;
 
-    public GeneradorLR(Gramatica gram) {
+    public GeneradorLR(Gramatica gramatica) {
         this.estadosLR = new TreeSet<>();
         this.transicionesLR = new ArrayList<>();
-        this.gram = gram;
+        GRAMATICA = gramatica;
         this.llaveEstados = 0;
+        construirEstadosLR();
     }
-
-    public void construirEstadosLR() {
-        Produccion inicio = gram.getRaiz();
+    
+    public ParserLR getParserLR(){
+        return new ParserLR(GRAMATICA, tablaLR);
+    }
+    
+    private void construirEstadosLR() {
+        Produccion inicio = GRAMATICA.getRaiz();
         if (inicio == null) {
             //Reportar error al inicio del algoritmo, imposible obtener la producción de inicio
             return;
         }
-        gram.cambiarModoLR();
         //Item aumentado... que vendría a ser la producción raíz del estado inicial
         ItemLR itemAumentado = new ItemLR(inicio, Elemento.ELEM_FINAL);
         //Nuevo estado vacío...
@@ -72,7 +76,7 @@ public class GeneradorLR {
         while (!pilaAuxiliar.isEmpty()) {
             EstadoLR origen = pilaAuxiliar.pop();
             //Elementos de la gramática
-            Iterator<Elemento> itElementos = gram.getElementosLR().values().iterator();
+            Iterator<Elemento> itElementos = GRAMATICA.getElementosLR().values().iterator();
             while (itElementos.hasNext()) {
                 Elemento transicion = itElementos.next();
                 EstadoLR nuevo = ir_a(origen, transicion.getId());
@@ -88,22 +92,25 @@ public class GeneradorLR {
                     }
                     if (destino == null) {
                         destino = llaveEstados++;
-                    }
-                    nuevo.setId(destino);
-                    TransicionLR nueva = new TransicionLR(origen.getId(), destino, transicion.getId());
-                    this.transicionesLR.add(nueva);
-                    if (this.estadosLR.add(nuevo)) {
-                        pilaAuxiliar.add(nuevo);
+                        nuevo.setId(destino);
+                        TransicionLR nueva = new TransicionLR(origen.getId(), destino, transicion.getId());
+                        this.transicionesLR.add(nueva);
+                        if (this.estadosLR.add(nuevo)) {
+                            pilaAuxiliar.add(nuevo);
+                        }
+                    } else {
+                        TransicionLR nueva = new TransicionLR(origen.getId(), destino, transicion.getId());
+                        this.transicionesLR.add(nueva);
                     }
                 }
             }
         }
-        dibujarGrafo();
-        tablaLR = new TablaAnalisisLR(gram, estadosLR, transicionesLR);
-        tablaLR.mostrar();
+        tablaLR = new TablaAnalisisLR(GRAMATICA, estadosLR, transicionesLR);
+        tablaLR.generarCSV();
+        System.err.println(tablaLR.getInformeConflictos());
     }
 
-    private void dibujarGrafo() {
+    public void dibujarGrafo() {
         Graphviz gv = new Graphviz();
         gv.startGraph();
         gv.addln("graph [fontsize=10 rankdir = \"LR\"];");
@@ -112,18 +119,17 @@ public class GeneradorLR {
         Iterator<EstadoLR> itEstados = this.estadosLR.iterator();
         while (itEstados.hasNext()) {
             EstadoLR next = itEstados.next();
-            gv.addln(next.getDOT(gram));
+            gv.addln(next.getDOT(GRAMATICA));
         }
         Iterator<TransicionLR> itTransiciones = this.transicionesLR.iterator();
         while (itTransiciones.hasNext()) {
             TransicionLR next = itTransiciones.next();
-            gv.addln(next.getDOT(gram));
+            gv.addln(next.getDOT(GRAMATICA));
         }
         gv.endGraph();
-        System.out.println(gv.getDotSource());
         String type = "png";
-        File out = new File("ejemplo." + type);
-        gv.writeGraphToFile(gv.getGraph(gv.getDotSource(), type), out);        
+        File out = new File("informeEstados." + type);
+        gv.writeGraphToFile(gv.getGraph(gv.getDotSource(), type), out);
     }
 
     private EstadoLR ir_a(EstadoLR I, Integer X) {
@@ -146,37 +152,37 @@ public class GeneradorLR {
     }
 
     private EstadoLR cerradura(EstadoLR I) {
-        EstadoLR J = new EstadoLR(I.getId());
+        Stack<ItemLR> pilaAuxiliar = new Stack<>();
         Iterator<ItemLR> iterator = I.iterator();
         while (iterator.hasNext()) {
-            ItemLR next = iterator.next();
-            if (next.fueRecorrido()) {
-                continue;
-            }
-            next.marcarComoRecorrido();
-            J.add(next);
+            ItemLR temp = iterator.next();
+            pilaAuxiliar.push(temp);
+        }
+        while (!pilaAuxiliar.isEmpty()) {
+            ItemLR next = pilaAuxiliar.pop();
             if (next.getPuntero() < next.getDerivacion().size()) {
-                Elemento temp = gram.getElemento(next.getDerivacion().get(next.getPuntero()));
+                Elemento temp = GRAMATICA.getElemento(next.getDerivacion().get(next.getPuntero()));
                 if (temp != null && temp.esNoTerminal()) {
-                    Iterator<Produccion> beta = gram.getProducciones(temp.getId()).iterator();
+                    Iterator<Produccion> beta = GRAMATICA.getProducciones(temp.getId()).iterator();
                     TreeSet<Integer> anticipacion = anticipacion(next.getBeta(), next.getAnticipacion());
                     while (beta.hasNext()) {
                         Produccion prod = beta.next();
                         ItemLR nuevo = new ItemLR(prod, anticipacion);
-                        J.add(nuevo);
+                        if (I.add(nuevo)) {
+                            pilaAuxiliar.push(nuevo);
+                        }
                     }
-                    J.addAll(cerradura(J));
                 }
             }
         }
-        return J;
+        return I;
     }
 
     private TreeSet<Integer> anticipacion(ArrayList<Integer> Beta, TreeSet<Integer> a) {
         Iterator<Integer> itBeta = Beta.iterator();
         TreeSet<Integer> anticipacion = new TreeSet<>();
         while (itBeta.hasNext()) {
-            Elemento temp = gram.getElementosLR().get(itBeta.next());
+            Elemento temp = GRAMATICA.getElementosLR().get(itBeta.next());
             //No contiene al elemento epsilon
             if (!temp.getPrimeros().contains(Elemento.ELEM_EPSILON.getId())) {
                 anticipacion.addAll(temp.getPrimeros());
