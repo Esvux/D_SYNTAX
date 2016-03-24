@@ -7,7 +7,6 @@ import com.esvux.AST.Gramatica.Produccion;
 import com.esvux.AST.AnalizadorLR.GeneradorLR;
 import com.esvux.AST.Gramatica.Gramatica;
 import com.esvux.AST.*;
-import com.esvux.AST.AnalizadorLR.ParserLR;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -18,22 +17,21 @@ public class ParserGramatica implements ParserGramaticaConstants {
     public static void main(String args[]) throws ParseException {
         ParserGramatica parser = new ParserGramatica(new java.io.StringReader(
                 "Terminal entero as Int;\n"
-                + "Terminal mas, por, parD, parI;\n"
-                + "NoTerminal E;\n"
+                + "Terminal mas, por;\n"
+                + "NoTerminal S, E;\n"
                 + "RegistrarPrecedencia(2,Asociatividad.izq, por);\n"
                 + "RegistrarPrecedencia(1,Asociatividad.izq, mas);\n"
-                + "Raiz = E;\n"
-                + "E.Regla = E + mas + <:: write(\"sumando...\"); ::> E \n"
-                + "     | E + por  + <:: write(\"multiplicando...\"); ::> E \n"
-                + "     | parD + E + parI \n"
+                + "Raiz = S;\n"
+                + "S.Regla = E;\n"
+                + "E.Regla = E + mas + E \n"
+                + "     | E + por + E \n"
                 + "     | entero;\n"
         ));
         parser.gramatica = new Gramatica();
         parser.GRAMATICA();
-        Gramatica gramatica = parser.gramatica;
-        gramatica.cambiarModoLR();
         GeneradorLR gen = new GeneradorLR(parser.gramatica);
-        ParserLR parserlr = gen.getParserLR();
+        gen.construirEstadosLR();
+        System.out.println("Exito!!!");
     }
 
 //<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
