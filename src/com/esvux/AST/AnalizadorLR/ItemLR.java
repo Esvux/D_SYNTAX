@@ -16,8 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 // </editor-fold>                        
-package com.esvux.AST.gramatica;
+package com.esvux.AST.AnalizadorLR;
 
+import com.esvux.AST.Gramatica.Elemento;
+import com.esvux.AST.Gramatica.Produccion;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.TreeSet;
@@ -31,24 +33,31 @@ public class ItemLR implements Comparable<ItemLR> {
     private Integer encabezado;
     private ArrayList<Integer> derivacion;
     private TreeSet<Integer> anticipacion;
+    private Integer numProduccion;
     private Integer puntero;
     private Boolean fueRecorrido;
 
     public ItemLR(Produccion produccion, Elemento anticipacion) {
         this.encabezado = produccion.getEncabezado();
         this.puntero = 0;
+        if(produccion.esMarcador())
+            this.puntero = 1;            
         this.derivacion = produccion.getDerivacion();
         this.anticipacion = new TreeSet<>();
         this.anticipacion.add(anticipacion.getId());
         this.fueRecorrido = false;
+        this.numProduccion = produccion.getId();
     }
-    
-    public ItemLR(Produccion produccion, TreeSet<Integer> anticipacion){
+
+    public ItemLR(Produccion produccion, TreeSet<Integer> anticipacion) {
         this.encabezado = produccion.getEncabezado();
         this.puntero = 0;
+        if(produccion.esMarcador())
+            this.puntero = 1;            
         this.derivacion = produccion.getDerivacion();
         this.anticipacion = anticipacion;
         this.fueRecorrido = false;
+        this.numProduccion = produccion.getId();
     }
 
     public ItemLR(ItemLR copia) {
@@ -57,6 +66,7 @@ public class ItemLR implements Comparable<ItemLR> {
         this.derivacion = copia.derivacion;
         this.anticipacion = copia.anticipacion;
         this.fueRecorrido = false;
+        this.numProduccion = copia.numProduccion;
     }
 
 // <editor-fold defaultstate="collapsed" desc="Getters & Setters">
@@ -90,11 +100,11 @@ public class ItemLR implements Comparable<ItemLR> {
 
     public void correrPuntero() {
         this.puntero = puntero + 1;
-    }   
-    
-    public ArrayList<Integer> getBeta(){
+    }
+
+    public ArrayList<Integer> getBeta() {
         ArrayList<Integer> beta = new ArrayList<>();
-        for (int i=puntero+1; i<derivacion.size(); i++) {
+        for (int i = puntero + 1; i < derivacion.size(); i++) {
             beta.add(derivacion.get(i));
         }
         return beta;
@@ -106,12 +116,16 @@ public class ItemLR implements Comparable<ItemLR> {
 
     public void marcarComoRecorrido() {
         this.fueRecorrido = true;
-    }    
-    
-    public void desmarcarComoRecorrido(){
+    }
+
+    public void desmarcarComoRecorrido() {
         this.fueRecorrido = false;
     }
-    
+
+    public Integer getNumProduccion() {
+        return numProduccion;
+    }
+
 // </editor-fold>      
     
     @Override
@@ -136,32 +150,37 @@ public class ItemLR implements Comparable<ItemLR> {
         while (oDer.hasNext() && thisDer.hasNext()) {
             Integer oNext = oDer.next();
             Integer thisNext = thisDer.next();
-            if(thisNext < oNext)
+            if (thisNext < oNext) {
                 return -1;
-            if(thisNext > oNext)
+            }
+            if (thisNext > oNext) {
                 return +1;
+            }
         }
-        if(thisDer.hasNext())
+        if (thisDer.hasNext()) {
             return +1;
-        if(oDer.hasNext())
+        }
+        if (oDer.hasNext()) {
             return -1;
-        //Compara los simbolos de anticipación
+        }
+        //Compara los simbolos de anticipación        
         Iterator<Integer> thisAnt = this.anticipacion.iterator();
-        Iterator<Integer> oAnt = o.anticipacion.iterator();
-        while (oAnt.hasNext() && thisAnt.hasNext()) {
-            Integer oNext = oAnt.next();
+        while (thisAnt.hasNext()) {
             Integer thisNext = thisAnt.next();
-            if(thisNext < oNext)
-                return -1;
-            if(thisNext > oNext)
-                return +1;
+            Iterator<Integer> oAnt = o.anticipacion.iterator();
+            int buscado = 20;
+            while (oAnt.hasNext()) {
+                Integer oNext = oAnt.next();
+                buscado = thisNext.compareTo(oNext);
+                if (buscado == 0) {
+                    break;
+                }
+            }
+            if (buscado != 0) {
+                return buscado;
+            }
         }
-        if(thisAnt.hasNext())
-            return +1;
-        if(oAnt.hasNext())
-            return -1;
         return 0;
     }
 
-    
 }

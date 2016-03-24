@@ -16,8 +16,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 // </editor-fold>                        
-package com.esvux.AST.gramatica;
+package com.esvux.AST.AnalizadorLR;
 
+import com.esvux.AST.Gramatica.Elemento;
+import com.esvux.AST.Gramatica.Gramatica;
+import com.esvux.AST.Gramatica.Produccion;
+import com.esvux.Graficas.Graphviz;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Stack;
@@ -30,17 +35,16 @@ import java.util.TreeSet;
 public class GeneradorLR {
 
     private TreeSet<EstadoLR> estadosLR;
-    private Gramatica gram;
-    private static Integer llaveEstados = 0;
-    private static final String prefijoEstados = "S";
+    private ArrayList<TransicionLR> transicionesLR;
+    private TablaAnalisisLR tablaLR;
+    private static Gramatica gram;
+    private Integer llaveEstados;
 
     public GeneradorLR(Gramatica gram) {
         this.estadosLR = new TreeSet<>();
+        this.transicionesLR = new ArrayList<>();
         this.gram = gram;
-    }
-
-    private static String getNuevoNombre() {
-        return prefijoEstados + llaveEstados++;
+        this.llaveEstados = 0;
     }
 
     public void construirEstadosLR() {
@@ -53,7 +57,7 @@ public class GeneradorLR {
         //Item aumentado... que vendría a ser la producción raíz del estado inicial
         ItemLR itemAumentado = new ItemLR(inicio, Elemento.ELEM_FINAL);
         //Nuevo estado vacío...
-        EstadoLR inicial = new EstadoLR(getNuevoNombre());
+        EstadoLR inicial = new EstadoLR(llaveEstados++);
         //Agrego el elemento al nuevo estado...
         inicial.add(itemAumentado);
         //Reemplazo el estado inicial por el resultado de aplicar la cerradura sobre él...
@@ -66,26 +70,64 @@ public class GeneradorLR {
         pilaAuxiliar.push(inicial);
         //Inicia las operaciones IR_A sobre los estados, mientras hayan estados aún en la pila...
         while (!pilaAuxiliar.isEmpty()) {
-            EstadoLR pivote = pilaAuxiliar.pop();
-            for (Iterator<Elemento> itElementos = gram.getElementosLR().values().iterator(); itElementos.hasNext();) {
-                EstadoLR nuevo = ir_a(pivote, itElementos.next().getId());
+            EstadoLR origen = pilaAuxiliar.pop();
+            //Elementos de la gramática
+            Iterator<Elemento> itElementos = gram.getElementosLR().values().iterator();
+            while (itElementos.hasNext()) {
+                Elemento transicion = itElementos.next();
+                EstadoLR nuevo = ir_a(origen, transicion.getId());
                 if (!nuevo.isEmpty()) {
-                    nuevo.setNombre(getNuevoNombre());
-                    this.estadosLR.add(nuevo);
-                    pilaAuxiliar.add(nuevo);
+                    Iterator<EstadoLR> it = this.estadosLR.iterator();
+                    Integer destino = null;
+                    while (it.hasNext()) {
+                        EstadoLR next = it.next();
+                        if (next.compareTo(nuevo) == 0) {
+                            destino = next.getId();
+                            break;
+                        }
+                    }
+                    if (destino == null) {
+                        destino = llaveEstados++;
+                    }
+                    nuevo.setId(destino);
+                    TransicionLR nueva = new TransicionLR(origen.getId(), destino, transicion.getId());
+                    this.transicionesLR.add(nueva);
+                    if (this.estadosLR.add(nuevo)) {
+                        pilaAuxiliar.add(nuevo);
+                    }
                 }
             }
         }
-        for (Iterator<EstadoLR> iterator = this.estadosLR.iterator(); iterator.hasNext();) {
-            EstadoLR next = iterator.next();
-            System.out.println("-----------------------------------");
-            next.mostrar(gram);
+        dibujarGrafo();
+        tablaLR = new TablaAnalisisLR(gram, estadosLR, transicionesLR);
+        tablaLR.mostrar();
+    }
+
+    private void dibujarGrafo() {
+        Graphviz gv = new Graphviz();
+        gv.startGraph();
+        gv.addln("graph [fontsize=10 rankdir = \"LR\"];");
+        gv.addln("ratio = auto;");
+        gv.addln("node[style = \"filled, bold\" penwidth = 3 fillcolor = \"white\" fontname = \"Courier New\" shape = \"Mrecord\"];");
+        Iterator<EstadoLR> itEstados = this.estadosLR.iterator();
+        while (itEstados.hasNext()) {
+            EstadoLR next = itEstados.next();
+            gv.addln(next.getDOT(gram));
         }
-        System.out.println("-----------------------------------");
+        Iterator<TransicionLR> itTransiciones = this.transicionesLR.iterator();
+        while (itTransiciones.hasNext()) {
+            TransicionLR next = itTransiciones.next();
+            gv.addln(next.getDOT(gram));
+        }
+        gv.endGraph();
+        System.out.println(gv.getDotSource());
+        String type = "png";
+        File out = new File("ejemplo." + type);
+        gv.writeGraphToFile(gv.getGraph(gv.getDotSource(), type), out);        
     }
 
     private EstadoLR ir_a(EstadoLR I, Integer X) {
-        EstadoLR J = new EstadoLR("");
+        EstadoLR J = new EstadoLR(-1);
         for (Iterator<ItemLR> itItems = I.iterator(); itItems.hasNext();) {
             ItemLR next = itItems.next();
             ItemLR nuevo = new ItemLR(next);
@@ -104,8 +146,9 @@ public class GeneradorLR {
     }
 
     private EstadoLR cerradura(EstadoLR I) {
-        EstadoLR J = new EstadoLR(I.getNombre());
-        for (Iterator<ItemLR> iterator = I.iterator(); iterator.hasNext();) {
+        EstadoLR J = new EstadoLR(I.getId());
+        Iterator<ItemLR> iterator = I.iterator();
+        while (iterator.hasNext()) {
             ItemLR next = iterator.next();
             if (next.fueRecorrido()) {
                 continue;
