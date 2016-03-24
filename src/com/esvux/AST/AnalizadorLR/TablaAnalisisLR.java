@@ -87,8 +87,9 @@ public class TablaAnalisisLR {
                         this.acciones[trans.getTransicion()][trans.getOrigen()] = AccionLR.desplazamiento(trans.getDestino());
                     }
                 }
+            }else{
+                this.acciones[trans.getTransicion()][trans.getOrigen()] = AccionLR.desplazamiento(trans.getDestino());
             }
-            this.acciones[trans.getTransicion()][trans.getOrigen()] = AccionLR.desplazamiento(trans.getDestino());
         }
     }
 
